@@ -1,0 +1,6 @@
+{
+  "name": "NetGallery",
+  "description": "Galería fotográfica profesional con conexión a almacenamiento de red (SMB/WebDAV), edición de etiquetas, metadatos y generación de archivos sidecar XMP compatibles con software de escritorio, con sincronización en la nube en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
