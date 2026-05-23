@@ -58,9 +58,13 @@ class GalleryRepository(
     /**
      * Appends a real-time log to the terminal UI console
      */
-    private fun logSync(type: SyncLogType, msg: String) {
+    fun logSync(type: SyncLogType, msg: String) {
         val current = _syncLogs.value
         _syncLogs.value = current + SyncLog(type = type, message = msg)
+    }
+
+    fun addLog(type: SyncLogType, msg: String) {
+        logSync(type, msg)
     }
 
     /**

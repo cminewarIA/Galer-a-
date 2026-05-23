@@ -29,6 +29,15 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
     val syncFileName: StateFlow<String> = repository.syncFileName
     val syncLogs: StateFlow<List<SyncLog>> = repository.syncLogs
 
+    // OpenClaw Interface bindings
+    val openClawGatewayUrl = com.example.network.OpenClawGatewayManager.gatewayUrl
+    val openClawNodeName = com.example.network.OpenClawGatewayManager.nodeName
+    val openClawNodeUuid = com.example.network.OpenClawGatewayManager.nodeUuid
+    val openClawStatus = com.example.network.OpenClawGatewayManager.nodeStatus
+    val isOpenClawActiveSearch = com.example.network.OpenClawGatewayManager.isClawManagedSearch
+    val openClawTagsCount = com.example.network.OpenClawGatewayManager.indexedTagsCount
+    val openClawClusterNodes = com.example.network.OpenClawGatewayManager.networkNodeCluster
+
     // Search and Filters
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
@@ -78,31 +87,42 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
     // Direct dynamic suggestions based on current query
     val searchSuggestions: StateFlow<List<SearchSuggestion>> = combine(
         allAssets,
-        _searchQuery
-    ) { assets, query ->
+        _searchQuery,
+        com.example.network.OpenClawGatewayManager.nodeStatus,
+        com.example.network.OpenClawGatewayManager.isClawManagedSearch
+    ) { assets, query, clawStatus, clawManaged ->
         if (query.trim().length < 1) {
             return@combine emptyList<SearchSuggestion>()
         }
         val cleanQuery = query.lowercase().trim()
         val suggestions = mutableListOf<SearchSuggestion>()
+        val isOpenClawConnected = (clawStatus == "CONNECTED" && clawManaged)
 
         // Find matches in tags
         val tagsSet = assets.flatMap { asset ->
             asset.tags.split(",").map { it.trim() }
         }.filter { it.isNotEmpty() }.distinct()
         tagsSet.filter { it.lowercase().contains(cleanQuery) }.take(4).forEach { tag ->
-            suggestions.add(SearchSuggestion(tag, "tag"))
+            suggestions.add(SearchSuggestion(tag, "tag", isClawOptimized = isOpenClawConnected))
         }
 
         // Find matches in locations
         val locationsSet = assets.map { it.locationName.trim() }.filter { it.isNotEmpty() }.distinct()
         locationsSet.filter { it.lowercase().contains(cleanQuery) }.take(4).forEach { loc ->
-            suggestions.add(SearchSuggestion(loc, "location"))
+            suggestions.add(SearchSuggestion(loc, "location", isClawOptimized = isOpenClawConnected))
         }
 
         // Find matches in filenames
         assets.filter { it.fileName.lowercase().contains(cleanQuery) }.take(3).forEach { asset ->
-            suggestions.add(SearchSuggestion(asset.fileName, "file"))
+            suggestions.add(SearchSuggestion(asset.fileName, "file", isClawOptimized = isOpenClawConnected))
+        }
+
+        // Special OpenClaw Cluster nodes simulated tag recommendations when connected!
+        if (isOpenClawConnected) {
+            val clusterTags = listOf("claw-cluster-backup", "gateway-verified", "nodo-distribuido")
+            clusterTags.filter { it.contains(cleanQuery) }.forEach { cTag ->
+                suggestions.add(SearchSuggestion(cTag, "cluster_tag", isClawOptimized = true))
+            }
         }
 
         suggestions.distinctBy { it.text.lowercase() + "_" + it.type }
@@ -334,9 +354,32 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
     fun clearLogs() {
         repository.clearLogs()
     }
+
+    /**
+     * OpenClaw control triggers
+     */
+    fun connectToOpenClaw(url: String, name: String) {
+        com.example.network.OpenClawGatewayManager.connectToGateway(url, name, repository, viewModelScope)
+    }
+
+    fun disconnectFromOpenClaw() {
+        com.example.network.OpenClawGatewayManager.disconnectFromGateway(repository, viewModelScope)
+    }
+
+    fun syncOpenClawTags() {
+        com.example.network.OpenClawGatewayManager.syncNodeTags(repository, viewModelScope)
+    }
+
+    fun toggleOpenClawSearch(enabled: Boolean) {
+        com.example.network.OpenClawGatewayManager.toggleClawManagedSearch(enabled, repository)
+    }
 }
 
-data class SearchSuggestion(val text: String, val type: String)
+data class SearchSuggestion(
+    val text: String,
+    val type: String,
+    val isClawOptimized: Boolean = false
+)
 
 class GalleryViewModelFactory(private val repository: GalleryRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

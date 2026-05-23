@@ -3,6 +3,8 @@ package com.example.ui
 import android.text.format.Formatter
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,10 +91,20 @@ fun GalleryApp(viewModel: GalleryViewModel) {
     val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
     val aiMessage by viewModel.aiRecommendationMessage.collectAsStateWithLifecycle()
 
+    // OpenClaw states
+    val openClawGatewayUrl by viewModel.openClawGatewayUrl.collectAsStateWithLifecycle()
+    val openClawNodeName by viewModel.openClawNodeName.collectAsStateWithLifecycle()
+    val openClawNodeUuid by viewModel.openClawNodeUuid.collectAsStateWithLifecycle()
+    val openClawStatus by viewModel.openClawStatus.collectAsStateWithLifecycle()
+    val isOpenClawActiveSearch by viewModel.isOpenClawActiveSearch.collectAsStateWithLifecycle()
+    val openClawTagsCount by viewModel.openClawTagsCount.collectAsStateWithLifecycle()
+    val openClawClusterNodes by viewModel.openClawClusterNodes.collectAsStateWithLifecycle()
+
     // Dialog sheets state
     var showAddShareDialog by remember { mutableStateOf(false) }
     var showCloudDialog by remember { mutableStateOf(false) }
     var showTelemetryConsole by remember { mutableStateOf(false) }
+    var showOpenClawDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -106,11 +118,12 @@ fun GalleryApp(viewModel: GalleryViewModel) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Star, // Gold branding star
+                            Image(
+                                painter = painterResource(id = com.example.R.drawable.img_app_logo),
                                 contentDescription = "Logo",
-                                tint = PhotoAmber,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(6.dp))
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -170,6 +183,24 @@ fun GalleryApp(viewModel: GalleryViewModel) {
                                     tint = if (cloudConfig?.isAutoSyncEnabled == true) EmeraldSync else LightTextMuted
                                 )
                             }
+                        }
+
+                        // OpenClaw Node Setup Access
+                        IconButton(
+                            onClick = { showOpenClawDialog = true },
+                            modifier = Modifier.testTag("openclaw_settings_button")
+                        ) {
+                            val clawColor = when (openClawStatus) {
+                                "CONNECTED" -> EmeraldSync
+                                "CONNECTING" -> PhotoAmber
+                                "SYNC_INDEX" -> OceanBlue
+                                else -> LightTextMuted
+                            }
+                            Icon(
+                                imageVector = Icons.Default.Build, // Represent node link hub
+                                contentDescription = "OpenClaw Node",
+                                tint = clawColor
+                            )
                         }
 
                         // Cloud Setup Access
@@ -311,6 +342,24 @@ fun GalleryApp(viewModel: GalleryViewModel) {
             onDismiss = { showTelemetryConsole = false },
             onStartSync = { viewModel.triggerMassiveCloudSync() },
             onClear = { viewModel.clearLogs() }
+        )
+    }
+
+    // 8. OpenClaw Distributed Gateway Dialog
+    if (showOpenClawDialog) {
+        OpenClawDialog(
+            status = openClawStatus,
+            url = openClawGatewayUrl,
+            name = openClawNodeName,
+            uuid = openClawNodeUuid,
+            activeSearch = isOpenClawActiveSearch,
+            indexedTags = openClawTagsCount,
+            clusterNodes = openClawClusterNodes,
+            onDismiss = { showOpenClawDialog = false },
+            onConnect = { urlConfig, labelConfig -> viewModel.connectToOpenClaw(urlConfig, labelConfig) },
+            onDisconnect = { viewModel.disconnectFromOpenClaw() },
+            onSync = { viewModel.syncOpenClawTags() },
+            onToggleSearch = { enabled -> viewModel.toggleOpenClawSearch(enabled) }
         )
     }
 }
@@ -590,6 +639,10 @@ fun FilterAndSearchSection(
                                 onToggleLocation(suggestion.text)
                                 onSearchQueryChanged("") // auto clear
                             })
+                            "cluster_tag" -> Triple(Icons.Filled.Share, "Clúster Claw", {
+                                onToggleTag(suggestion.text)
+                                onSearchQueryChanged("") // auto clear
+                            })
                             else -> Triple(Icons.Filled.Home, "Archivo", {
                                 onSearchQueryChanged(suggestion.text)
                             })
@@ -605,20 +658,37 @@ fun FilterAndSearchSection(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = PhotoAmber,
+                                tint = if (suggestion.isClawOptimized) PhotoAmber else LightTextMuted,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = suggestion.text,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White,
+                                color = if (suggestion.isClawOptimized) PhotoAmber else Color.White,
                                 modifier = Modifier.weight(1f)
                             )
+                            if (suggestion.isClawOptimized) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .background(PhotoAmber.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "OpenClaw",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp,
+                                            color = PhotoAmber
+                                        )
+                                    )
+                                }
+                            }
                             Text(
                                 text = typeText,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = LightTextMuted
+                                color = if (suggestion.isClawOptimized) PhotoAmber else LightTextMuted
                             )
                         }
                         Divider(color = CarbonSlate)
@@ -1964,6 +2034,292 @@ fun TelemetryConsoleDialog(
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "", tint = DeepCharcoal, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Sincronizar Todo", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun OpenClawDialog(
+    status: String,
+    url: String,
+    name: String,
+    uuid: String,
+    activeSearch: Boolean,
+    indexedTags: Int,
+    clusterNodes: List<String>,
+    onDismiss: () -> Unit,
+    onConnect: (String, String) -> Unit,
+    onDisconnect: () -> Unit,
+    onSync: () -> Unit,
+    onToggleSearch: (Boolean) -> Unit
+) {
+    var gatewayInput by remember { mutableStateOf(url) }
+    var nodeNameInput by remember { mutableStateOf(name) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CarbonSlate),
+            border = BorderStroke(1.dp, Color(0xFF2C3E50)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("openclaw_dialog_box")
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share, 
+                        contentDescription = "OpenClaw Node",
+                        tint = PhotoAmber,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "OpenClaw Gateway",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Consola de Nodo Distribuido",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LightTextMuted
+                        )
+                    }
+                    
+                    // Connected/Active pulse dot
+                    val (statusColor, statusText) = when (status) {
+                        "CONNECTED" -> Pair(EmeraldSync, "CONECTADO")
+                        "CONNECTING" -> Pair(PhotoAmber, "CONECTANDO")
+                        "SYNC_INDEX" -> Pair(OceanBlue, "PUBLICANDO")
+                        else -> Pair(LightTextMuted, "DESCONECTADO")
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(statusColor)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = statusColor
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = Color(0xFF2C3E50))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (status == "CONNECTED" || status == "SYNC_INDEX") {
+                    // Node identity parameters
+                    Text(
+                        text = "ESTADO OPERACIONAL DEL NODO",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = PhotoAmber
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Nombre del Nodo:", style = MaterialTheme.typography.bodySmall, color = LightTextMuted)
+                                Text(name, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("ID del Nodo (UUID):", style = MaterialTheme.typography.bodySmall, color = LightTextMuted)
+                                Text(uuid, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = LightTextMuted)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Gateway Server:", style = MaterialTheme.typography.bodySmall, color = LightTextMuted)
+                                Text(url, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Etiquetas en Clúster:", style = MaterialTheme.typography.bodySmall, color = LightTextMuted)
+                                Text("$indexedTags Registradas", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = PhotoAmber)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Toggle distributed tags search
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Búsqueda Delegada", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                            Text("Sugerir etiquetas y organizar búsquedas distribuidas vía OpenClaw Gateway", style = MaterialTheme.typography.bodySmall, color = LightTextMuted)
+                        }
+                        Switch(
+                            checked = activeSearch,
+                            onCheckedChange = onToggleSearch,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PhotoAmber,
+                                checkedTrackColor = PhotoAmber.copy(alpha = 0.4f),
+                                uncheckedThumbColor = LightTextMuted,
+                                uncheckedTrackColor = DarkCardBg
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Cluster Neighbors Topology
+                    Text(
+                        text = "OTROS NODOS EN EL CLÚSTER OPENCLAW",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = LightTextMuted
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        clusterNodes.forEach { neighbor ->
+                            Box(
+                                modifier = Modifier
+                                    .background(DarkCardBg, RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(0xFF2C3E50), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.List, "neighbor", modifier = Modifier.size(10.dp), tint = LightTextMuted)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(neighbor, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDisconnect,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorCrimson),
+                            border = BorderStroke(1.dp, ErrorCrimson.copy(alpha = 0.5f))
+                        ) {
+                            Text("Desconectar")
+                        }
+
+                        Button(
+                            onClick = onSync,
+                            enabled = status == "CONNECTED",
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = PhotoAmber, contentColor = DeepCharcoal)
+                        ) {
+                            Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sincronizar", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    // Setup configuration form
+                    Text(
+                        text = "CONEXIÓN A GATEWAY CLAW",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = PhotoAmber
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = gatewayInput,
+                        onValueChange = { gatewayInput = it },
+                        label = { Text("URL del Gateway") },
+                        placeholder = { Text("http://192.168.1.50:9000") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = PhotoAmber,
+                            unfocusedBorderColor = Color(0xFF2C3E50)
+                        ),
+                        singleLine = true,
+                        enabled = status != "CONNECTING"
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = nodeNameInput,
+                        onValueChange = { nodeNameInput = it },
+                        label = { Text("Nombre del Nodo Local") },
+                        placeholder = { Text("Ingresar nombre descriptivo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = PhotoAmber,
+                            unfocusedBorderColor = Color(0xFF2C3E50)
+                        ),
+                        singleLine = true,
+                        enabled = status != "CONNECTING"
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.textButtonColors(contentColor = LightTextMuted)
+                        ) {
+                            Text("Cancelar")
+                        }
+
+                        Button(
+                            onClick = { onConnect(gatewayInput, nodeNameInput) },
+                            enabled = gatewayInput.isNotEmpty() && nodeNameInput.isNotEmpty() && status != "CONNECTING",
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = PhotoAmber, contentColor = DeepCharcoal)
+                        ) {
+                            if (status == "CONNECTING") {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = DeepCharcoal, strokeWidth = 2.dp)
+                            } else {
+                                Text("Acoplar Nodo", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
