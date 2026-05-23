@@ -18,8 +18,11 @@ object OpenClawGatewayManager {
     private const val TAG = "OpenClawGateway"
 
     // OpenClaw Node State parameters
-    private val _gatewayUrl = MutableStateFlow("http://192.168.1.155:9000")
+    private val _gatewayUrl = MutableStateFlow("http://192.168.50.2:9000")
     val gatewayUrl = _gatewayUrl.asStateFlow()
+
+    private val _gatewayToken = MutableStateFlow("dad15a56439be042bb5f4ae2f6e56745e94bb1e8f788cfc5")
+    val gatewayToken = _gatewayToken.asStateFlow()
 
     private val _nodeName = MutableStateFlow("NetGallery-Studio-Node-1")
     val nodeName = _nodeName.asStateFlow()
@@ -49,16 +52,17 @@ object OpenClawGatewayManager {
     /**
      * Attempts node pair and handshake connection to the centralized OpenClaw cluster gateway.
      */
-    fun connectToGateway(url: String, name: String, repository: GalleryRepository, scope: CoroutineScope) {
+    fun connectToGateway(url: String, name: String, token: String, repository: GalleryRepository, scope: CoroutineScope) {
         _gatewayUrl.value = url
         _nodeName.value = name
+        _gatewayToken.value = token
         _nodeStatus.value = "CONNECTING"
 
         scope.launch(Dispatchers.IO) {
-            appendRepositoryLog(repository, SyncLogType.Info, "OpenClaw Node Protocol: Solicitando emparejamiento con Gateway en $url...")
+            appendRepositoryLog(repository, SyncLogType.Info, "OpenClaw Node Protocol: Solicitando emparejamiento con Gateway en $url utilizando token de seguridad ${if (token.length > 8) token.take(8) + "..." else token}...")
             delay(1000)
 
-            appendRepositoryLog(repository, SyncLogType.Info, "OpenClaw: Verificando firmas criptográficas de nodo '${name}'...")
+            appendRepositoryLog(repository, SyncLogType.Info, "OpenClaw: Verificando firmas criptográficas de nodo '${name}' y token de acceso de red...")
             delay(800)
 
             // Register Successfully

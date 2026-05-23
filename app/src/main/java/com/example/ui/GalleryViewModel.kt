@@ -31,6 +31,7 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
 
     // OpenClaw Interface bindings
     val openClawGatewayUrl = com.example.network.OpenClawGatewayManager.gatewayUrl
+    val openClawGatewayToken = com.example.network.OpenClawGatewayManager.gatewayToken
     val openClawNodeName = com.example.network.OpenClawGatewayManager.nodeName
     val openClawNodeUuid = com.example.network.OpenClawGatewayManager.nodeUuid
     val openClawStatus = com.example.network.OpenClawGatewayManager.nodeStatus
@@ -232,8 +233,8 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
                         label = NetworkShareManager.DEFAULT_SHARE_LABEL,
                         type = "SMB (Compartido NAS)",
                         serverUrl = NetworkShareManager.EMULATOR_URL,
-                        user = "fotografo_estudio",
-                        pass = "ClaveSegura2026"
+                        user = "Yonah",
+                        pass = "Yasmany11"
                     )
                     // Set default cloud config mock to show Nextcloud capability
                     repository.saveCloudConfig(
@@ -358,8 +359,8 @@ class GalleryViewModel(private val repository: GalleryRepository) : ViewModel() 
     /**
      * OpenClaw control triggers
      */
-    fun connectToOpenClaw(url: String, name: String) {
-        com.example.network.OpenClawGatewayManager.connectToGateway(url, name, repository, viewModelScope)
+    fun connectToOpenClaw(url: String, name: String, token: String) {
+        com.example.network.OpenClawGatewayManager.connectToGateway(url, name, token, repository, viewModelScope)
     }
 
     fun disconnectFromOpenClaw() {

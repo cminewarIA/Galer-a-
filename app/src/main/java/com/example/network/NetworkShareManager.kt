@@ -11,7 +11,7 @@ import java.io.FileOutputStream
 object NetworkShareManager {
     private const val TAG = "NetworkShareManager"
     const val DEFAULT_SHARE_LABEL = "NAS-Estudio-Fotografia"
-    const val EMULATOR_URL = "smb://192.168.1.100/StudioShare"
+    const val EMULATOR_URL = "smb://192.168.50.3/photo"
 
     // Directories for local mock shares
     fun getShareDirectory(context: Context, shareName: String = "NAS-Estudio-Fotografia"): File {

@@ -93,6 +93,7 @@ fun GalleryApp(viewModel: GalleryViewModel) {
 
     // OpenClaw states
     val openClawGatewayUrl by viewModel.openClawGatewayUrl.collectAsStateWithLifecycle()
+    val openClawGatewayToken by viewModel.openClawGatewayToken.collectAsStateWithLifecycle()
     val openClawNodeName by viewModel.openClawNodeName.collectAsStateWithLifecycle()
     val openClawNodeUuid by viewModel.openClawNodeUuid.collectAsStateWithLifecycle()
     val openClawStatus by viewModel.openClawStatus.collectAsStateWithLifecycle()
@@ -350,13 +351,14 @@ fun GalleryApp(viewModel: GalleryViewModel) {
         OpenClawDialog(
             status = openClawStatus,
             url = openClawGatewayUrl,
+            token = openClawGatewayToken,
             name = openClawNodeName,
             uuid = openClawNodeUuid,
             activeSearch = isOpenClawActiveSearch,
             indexedTags = openClawTagsCount,
             clusterNodes = openClawClusterNodes,
             onDismiss = { showOpenClawDialog = false },
-            onConnect = { urlConfig, labelConfig -> viewModel.connectToOpenClaw(urlConfig, labelConfig) },
+            onConnect = { urlConfig, labelConfig, tokenConfig -> viewModel.connectToOpenClaw(urlConfig, labelConfig, tokenConfig) },
             onDisconnect = { viewModel.disconnectFromOpenClaw() },
             onSync = { viewModel.syncOpenClawTags() },
             onToggleSearch = { enabled -> viewModel.toggleOpenClawSearch(enabled) }
@@ -1644,11 +1646,11 @@ fun AddShareDialog(
     onDismiss: () -> Unit,
     onSubmit: (String, String, String, String, String) -> Unit
 ) {
-    var label by remember { mutableStateOf("") }
+    var label by remember { mutableStateOf("Mi Biblioteca SMB") }
     var shareType by remember { mutableStateOf("SMB (Samba/Compartido)") }
-    var serverUrl by remember { mutableStateOf("smb://192.168.1.") }
-    var user by remember { mutableStateOf("") }
-    var pass by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf("smb://192.168.50.3/photo") }
+    var user by remember { mutableStateOf("Yonah") }
+    var pass by remember { mutableStateOf("Yasmany11") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -1690,7 +1692,7 @@ fun AddShareDialog(
                                     .clip(RoundedCornerShape(6.dp))
                                     .clickable { 
                                         shareType = "$opt (Red)"
-                                        serverUrl = if (opt == "WebDAV") "http://192.168.1.5:80/webdav" else "smb://192.168.1.100/StudioShare"
+                                        serverUrl = if (opt == "WebDAV") "http://192.168.1.5:80/webdav" else "smb://192.168.50.3/photo"
                                     }
                                     .background(if (isSelected) PhotoAmber else DarkCardBg)
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -2046,18 +2048,20 @@ fun TelemetryConsoleDialog(
 fun OpenClawDialog(
     status: String,
     url: String,
+    token: String,
     name: String,
     uuid: String,
     activeSearch: Boolean,
     indexedTags: Int,
     clusterNodes: List<String>,
     onDismiss: () -> Unit,
-    onConnect: (String, String) -> Unit,
+    onConnect: (String, String, String) -> Unit,
     onDisconnect: () -> Unit,
     onSync: () -> Unit,
     onToggleSearch: (Boolean) -> Unit
 ) {
     var gatewayInput by remember { mutableStateOf(url) }
+    var tokenInput by remember { mutableStateOf(token) }
     var nodeNameInput by remember { mutableStateOf(name) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -2263,8 +2267,26 @@ fun OpenClawDialog(
                     OutlinedTextField(
                         value = gatewayInput,
                         onValueChange = { gatewayInput = it },
-                        label = { Text("URL del Gateway") },
-                        placeholder = { Text("http://192.168.1.50:9000") },
+                        label = { Text("URL del Gateway (OpenClaw)") },
+                        placeholder = { Text("http://192.168.50.2:9000") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = PhotoAmber,
+                            unfocusedBorderColor = Color(0xFF2C3E50)
+                        ),
+                        singleLine = true,
+                        enabled = status != "CONNECTING"
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = tokenInput,
+                        onValueChange = { tokenInput = it },
+                        label = { Text("Token de Seguridad (Acceso)") },
+                        placeholder = { Text("Ingresar token criptográfico") },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
@@ -2309,8 +2331,8 @@ fun OpenClawDialog(
                         }
 
                         Button(
-                            onClick = { onConnect(gatewayInput, nodeNameInput) },
-                            enabled = gatewayInput.isNotEmpty() && nodeNameInput.isNotEmpty() && status != "CONNECTING",
+                            onClick = { onConnect(gatewayInput, nodeNameInput, tokenInput) },
+                            enabled = gatewayInput.isNotEmpty() && nodeNameInput.isNotEmpty() && tokenInput.isNotEmpty() && status != "CONNECTING",
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = PhotoAmber, contentColor = DeepCharcoal)
                         ) {
