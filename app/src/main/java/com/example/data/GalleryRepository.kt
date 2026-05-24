@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -181,9 +182,8 @@ class GalleryRepository(
             // If none are specifically pending, we sync the entire index
             logSync(SyncLogType.Info, "No hay archivos marcados 'PENDIENTES'. Subiendo índice completo de red...")
             // Fetch directly from flow snapshot
-            val all = mutableListOf<MediaAsset>()
-            // Query room database directly (dummy run over all assets)
-            allAssets.collect { all.addAll(it) }
+            // Fetch directly from flow snapshot without blocking indefinitely
+            val all = allAssets.first()
             all
         }
 
